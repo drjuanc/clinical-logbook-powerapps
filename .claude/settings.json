@@ -1,0 +1,6 @@
+{
+  "enabledPlugins": {
+    "power-automate@power-platform-skills": true,
+    "canvas-apps@power-platform-skills": true
+  }
+}
