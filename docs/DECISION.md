@@ -77,13 +77,39 @@ Replace the paper clinical logbook with an electronic system that tracks procedu
 
 | List | Status | Key columns |
 |---|---|---|
-| **Students** | Exists — no change | `Student` (Person, identity), `Year`, `Hospital` (lookup), `Name`, `Pic`, `Dereg*` |
+| **Students** (existing `StudentList_DEV`) | Exists — no change | `Student` (Person, identity for `User().Email` match), `Number` (student number), `Name`, `Year`, `Hospital` (lookup), `Pic`, `Dereg*` |
 | **Hospitals** | Exists — **add** `Latitude`, `Longitude`, `RadiusMetres` | Site registry + geofence |
 | **Procedures** | New | `Title`, `YearLevel`, `RequiredCount`, `Category`, `Active` |
-| **Supervisors** | New | `Title` (full name), `Designation`, `CouncilNumber`, `Site` (lookup), `Status` (Registered/Pending) |
-| **LogEntries** | New — flow-write only | See below |
+| **Supervisors** | New | `Title` (full name), `Designation` (Choice — see LogEntries §7), `CouncilNumber`, `Site` (lookup), `Status` (Registered/Pending) |
+| **LogEntries** | New — flow-write only | See detailed schema below |
 
-**LogEntries columns:** `Student` (Person), `Procedure` (lookup), `SupervisionLevel` (Observed/Assisted/Performed under supervision/Performed independently), `SupervisorName` (text — copied, not just looked up, so history survives registry edits), `SupervisorDesignation`, `SupervisorRef` (lookup, blank if ad hoc), `SignatureImage`, `Latitude`, `Longitude`, `SiteMatch`, `LocationStatus` (Captured/Unavailable), `EntryStatus` (Valid/Flagged/Audit-verified), `Notes` (multiline — **no patient identifiers**, POPIA).
+**DEV/PROD environments** are managed via environment variables. All list names in this project have a `_DEV` suffix in development and drop the suffix in production; solution references use variables, not hardcoded names, so cutover requires no rebuilding of Lookups or formulas.
+
+### LogEntries — detailed schema (locked)
+
+| # | Column | Type | Notes |
+|---|---|---|---|
+| 1 | Title | Text | Computed by the write flow, e.g. `"Ndlovu S · Suturing · 11 Aug 2026"` — makes SharePoint default views readable. Not the identifier. |
+| 2 | Student | **Lookup → Students** | Primary display: `Number` (student number). Additional column: `Name`. Referential integrity enforced — cannot reference a non-existent student. Written by the flow using `varStudent.ID`. |
+| 3 | Procedure | Lookup → Procedures | Referential integrity to Procedures. |
+| 4 | SupervisionLevel | Choice | Observed / Assisted / Performed under supervision / Performed independently. |
+| 5 | SupervisorRef | Lookup → Supervisors | Blank if ad-hoc (supervisor not yet in registry). |
+| 6 | SupervisorName | Text | **Copied** from registry or ad-hoc entry at write time. Preserved even if the Supervisors row is later edited or deleted — this is the audit record. |
+| 7 | SupervisorDesignation | Choice | **Medical Doctor / Medical Intern / Professional Nurse / Enrolled Nurse / Clinical Associate / Other Health Professional.** Copied same as SupervisorName. |
+| 8 | SignatureImage | **Image column** | Written by the flow, which strips the `data:image/png;base64,` prefix from Pen Input, decodes to binary, and uploads. Renders as thumbnail in SharePoint views. |
+| 9 | Latitude | Number | Raw GPS at moment of logging. Stored for audit; never displayed raw to students. |
+| 10 | Longitude | Number | As above. |
+| 11 | SiteMatch | Text | Human-readable: `"St Barnabas (140 m)"` or `"No site within radius"`. Computed by the app via haversine against the student's Hospital, passed to the flow. |
+| 12 | LocationStatus | Choice | Captured / Unavailable. Blocks silent `(0,0)` storage; drives the "Flagged" status downstream. |
+| 13 | EntryStatus | Choice | Valid / Flagged / Audit-verified. Defaults to Valid on write; auto-set to Flagged if `LocationStatus = Unavailable`; set to Audit-verified by the monthly sampling flow. |
+| 14 | EntryDate | Date only | When the procedure was actually performed. Student-selectable. **Defaults to `Today()`, hard-blocked to the range `Today()-7 ≤ date ≤ Today()`** — no future, no backdating beyond 7 days. Distinct from SharePoint auto-`Created` timestamp; a gap between them is an audit signal. |
+| 15 | Notes | Multiline text | Optional case context. **No patient identifiers** — enforced by app-side helper text + POPIA consent, not by SharePoint. |
+
+Plus SharePoint's automatic system columns (do not add): `ID` (auto integer, the true identifier), `Created` (server timestamp — harder to spoof than a client-set date), `Created By` (will always be the write flow's service account, not the student), `Modified`, `Modified By`.
+
+**Design rules embedded in this schema:**
+- **Copied vs looked-up supervisor fields** — `SupervisorName` and `SupervisorDesignation` are copied text/choice at write time, not just references. This preserves the audit record if a Supervisors row is later edited or removed. `SupervisorRef` retains the link where one exists, for coordinator workflows.
+- **`EntryDate` backdating cap** — students are informed at induction and in-app: "You can only log procedures performed in the last 7 days." Enforces near-real-time logging and prevents assessment-eve backfilling.
 
 ---
 
