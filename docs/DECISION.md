@@ -75,41 +75,112 @@ Replace the paper clinical logbook with an electronic system that tracks procedu
 
 ## 3. Data model (settled)
 
-| List | Status | Key columns |
-|---|---|---|
-| **Students** (existing `StudentList_DEV`) | Exists — no change | `Student` (Person, identity for `User().Email` match), `Number` (student number), `Name`, `Year`, `Hospital` (lookup), `Pic`, `Dereg*` |
-| **Hospitals** | Exists — **add** `Latitude`, `Longitude`, `RadiusMetres` | Site registry + geofence |
-| **Procedures** | New | `Title`, `YearLevel`, `RequiredCount`, `Category`, `Active` |
-| **Supervisors** | New | `Title` (full name), `Designation` (Choice — see LogEntries §7), `CouncilNumber`, `Site` (lookup), `Status` (Registered/Pending) |
-| **LogEntries** | New — flow-write only | See detailed schema below |
+> **Status as at 12 Aug 2026:** all five lists exist in the DEV environment and are connected to the canvas app. The tables below record the **as-built** schema — internal names verified against the live lists via the Canvas Authoring MCP. Where the as-built state differs from the locked design, it is marked and carried into §3.1.
+
+| Role | Actual list (DEV) | Status | Key columns (internal names) |
+|---|---|---|---|
+| **Students** | `StudentList_DEV` | Exists — no change | `Student` (Person, identity for `User().Email` match), `Number` (student number), `Name`, `Year`, `Hospital` (lookup), `Pic`, `Dereg*` |
+| **Hospitals / Sites** | `TSites_DEV` | Exists — geofence columns **present** | `Title`, `acronyms`, `Latitude`, `Longitude`, `Radious` (⚠ misspelled — metres), `Acitve` (⚠ misspelled — Boolean), `Location` (text), `Coordinator` / `Admin` / `Lecturer` (Person), `Picture`, `Notes` |
+| **Procedures** | `Procedure_DEV` | Exists | `Title`, `YearLevel` (Choice), `RequiredCount` (Number), `Category` (Choice), `Module` (Choice — not in original design), `Active` (Boolean), ⚠ `RequiredCount0` (stray duplicate — delete) |
+| **Supervisors** | `Supervisor_DEV` | Exists — matches design | `Title` (full name), `Designation` (Choice), `CouncilNumber` (Text), `Site` (Lookup→TSites), `Status` (Choice: Registered/Pending) |
+| **LogEntries** | `LogEntries_DEV` | Exists — flow-write only | See detailed schema below |
 
 **DEV/PROD environments** are managed via environment variables. All list names in this project have a `_DEV` suffix in development and drop the suffix in production; solution references use variables, not hardcoded names, so cutover requires no rebuilding of Lookups or formulas.
 
-### LogEntries — detailed schema (locked)
+**Internal names are permanent.** SharePoint fixes a column's internal name at creation; renaming afterwards changes only the display name. Power Fx binds to the **internal** name. The misspellings above (`Radious`, `Acitve`) are therefore load-bearing — write formulas against them as spelled, and do not "correct" them in code.
 
-| # | Column | Type | Notes |
-|---|---|---|---|
-| 1 | Title | Text | Computed by the write flow, e.g. `"Ndlovu S · Suturing · 11 Aug 2026"` — makes SharePoint default views readable. Not the identifier. |
-| 2 | Student | **Lookup → Students** | Primary display: `Number` (student number). Additional column: `Name`. Referential integrity enforced — cannot reference a non-existent student. Written by the flow using `varStudent.ID`. |
-| 3 | Procedure | Lookup → Procedures | Referential integrity to Procedures. |
-| 4 | SupervisionLevel | Choice | Observed / Assisted / Performed under supervision / Performed independently. |
-| 5 | SupervisorRef | Lookup → Supervisors | Blank if ad-hoc (supervisor not yet in registry). |
-| 6 | SupervisorName | Text | **Copied** from registry or ad-hoc entry at write time. Preserved even if the Supervisors row is later edited or deleted — this is the audit record. |
-| 7 | SupervisorDesignation | Choice | **Medical Doctor / Medical Intern / Professional Nurse / Enrolled Nurse / Clinical Associate / Other Health Professional.** Copied same as SupervisorName. |
-| 8 | SignatureImage | **Image column** | Written by the flow, which strips the `data:image/png;base64,` prefix from Pen Input, decodes to binary, and uploads. Renders as thumbnail in SharePoint views. |
-| 9 | Latitude | Number | Raw GPS at moment of logging. Stored for audit; never displayed raw to students. |
-| 10 | Longitude | Number | As above. |
-| 11 | SiteMatch | Text | Human-readable: `"St Barnabas (140 m)"` or `"No site within radius"`. Computed by the app via haversine against the student's Hospital, passed to the flow. |
-| 12 | LocationStatus | Choice | Captured / Unavailable. Blocks silent `(0,0)` storage; drives the "Flagged" status downstream. |
-| 13 | EntryStatus | Choice | Valid / Flagged / Audit-verified. Defaults to Valid on write; auto-set to Flagged if `LocationStatus = Unavailable`; set to Audit-verified by the monthly sampling flow. |
-| 14 | EntryDate | Date only | When the procedure was actually performed. Student-selectable. **Defaults to `Today()`, hard-blocked to the range `Today()-7 ≤ date ≤ Today()`** — no future, no backdating beyond 7 days. Distinct from SharePoint auto-`Created` timestamp; a gap between them is an audit signal. |
-| 15 | Notes | Multiline text | Optional case context. **No patient identifiers** — enforced by app-side helper text + POPIA consent, not by SharePoint. |
+### LogEntries — detailed schema (as built)
 
-Plus SharePoint's automatic system columns (do not add): `ID` (auto integer, the true identifier), `Created` (server timestamp — harder to spoof than a client-set date), `Created By` (will always be the write flow's service account, not the student), `Modified`, `Modified By`.
+Internal names as verified in `LogEntries_DEV`. Use these exact strings in Power Fx and in the write flow.
+
+| # | Internal name | Display | Type | Notes |
+|---|---|---|---|---|
+| 1 | `Title` | Title | Text | Computed by the write flow, e.g. `"Ndlovu S · Suturing · 11 Aug 2026"` — makes SharePoint default views readable. Not the identifier. |
+| 2 | `Student` | Student | **Lookup → StudentList_DEV** | Primary display: `Number` (student number). Referential integrity enforced. Written by the flow using `varStudent.ID`. |
+| 2a | `Student_x003a__x0020_Name` | Student: Name | Lookup projection | Read-only projection of the student's `Name`, for display in SharePoint views. Not written. |
+| 3 | `Procedure` | Procedure | Lookup → `Procedure_DEV` | Referential integrity to Procedures. |
+| 4 | `Supervisionlevel` | Supervision level | Choice | Observed / Assisted / Performed under supervision / Performed independently. ⚠ Internal name is lower-case `l` — not `SupervisionLevel`. |
+| 5 | `Supervisor` | Supervisor | Lookup → `Supervisor_DEV` | The design's `SupervisorRef`. Blank if ad-hoc (supervisor not yet in registry). |
+| 5a | `Supervisor_x003a__x0020_Title` | Supervisor: Title | Lookup projection | ⚠ **Not a substitute for `SupervisorName`** — this is a live projection, not a copy. See §3.1 item 1. |
+| 6 | — | — | — | 🔴 **`SupervisorName` (Text) is MISSING.** Required by the audit model. See §3.1 item 1. |
+| 7 | `SupervisorDesignation` | SupervisorDesignation | ⚠ **Text** (design: Choice) | Should be a Choice of: Medical Doctor / Medical Intern / Professional Nurse / Enrolled Nurse / Clinical Associate / Other Health Professional. See §3.1 item 2. |
+| 8 | `Signature` | Signature | **Image column** | The design's `SignatureImage`. Written by the flow, which strips the `data:image/png;base64,` prefix from Pen Input, decodes to binary, and uploads. Renders as thumbnail in SharePoint views. |
+| 9 | `Latitude` | Latitude | Number | Raw GPS at moment of logging. Stored for audit; never displayed raw to students. |
+| 10 | `Longitude` | Longitude | Number | As above. |
+| 11 | `Sitematch` | SiteMatch | Text | Human-readable: `"St Barnabas (140 m)"` or `"No site within radius"`. Computed by the app via haversine against the student's site, passed to the flow. ⚠ Internal name is lower-case `m`. |
+| 12 | `LocationStatus` | LocationStatus | Choice | Captured / Unavailable. Blocks silent `(0,0)` storage; drives the "Flagged" status downstream. |
+| 13 | `EntryStatus` | EntryStatus | Choice | Valid / Flagged / Audit-verified. Defaults to Valid on write; auto-set to Flagged if `LocationStatus = Unavailable`; set to Audit-verified by the monthly sampling flow. |
+| 14 | `EntryDate` | EntryDate | Date only | When the procedure was actually performed. Student-selectable. **Defaults to `Today()`, hard-blocked to the range `Today()-7 ≤ date ≤ Today()`** — no future, no backdating beyond 7 days. Distinct from SharePoint auto-`Created` timestamp; a gap between them is an audit signal. |
+| 15 | `Notes` | Notes | Multiline text | Optional case context. **No patient identifiers** — enforced by app-side helper text + POPIA consent, not by SharePoint. |
+| ? | `Performace` | Performace | Number | ⚠ Not in the design. Purpose unconfirmed; name appears to be a misspelling of "Performance". See §3.1 item 3. |
+
+Plus SharePoint's automatic system columns (do not add): `ID` (auto integer, the true identifier), `Created` (server timestamp — harder to spoof than a client-set date), `Author` / "Created By" (will always be the write flow's service account, not the student), `Modified`, `Editor` / "Modified By".
 
 **Design rules embedded in this schema:**
-- **Copied vs looked-up supervisor fields** — `SupervisorName` and `SupervisorDesignation` are copied text/choice at write time, not just references. This preserves the audit record if a Supervisors row is later edited or removed. `SupervisorRef` retains the link where one exists, for coordinator workflows.
+- **Copied vs looked-up supervisor fields** — `SupervisorName` and `SupervisorDesignation` are copied text/choice at write time, not just references. This preserves the audit record if a Supervisors row is later edited or removed. `Supervisor` (the lookup) retains the link where one exists, for coordinator workflows.
 - **`EntryDate` backdating cap** — students are informed at induction and in-app: "You can only log procedures performed in the last 7 days." Enforces near-real-time logging and prevents assessment-eve backfilling.
+
+### 3.1 Outstanding schema changes (as at 12 Aug 2026)
+
+SharePoint column changes — must be made by hand in the list settings. The Canvas Authoring MCP cannot create or alter SharePoint columns.
+
+**1. 🔴 Add `SupervisorName` (single line of text) to `LogEntries_DEV` — blocking.**
+The list currently relies on the `Supervisor: Title` lookup projection, which is **live, not copied**. Two consequences, both breaking the audit model:
+  - Editing or deleting a `Supervisor_DEV` row retroactively rewrites the supervisor name on every historical entry that references it. The countersignature record silently changes after the fact.
+  - Ad-hoc supervisors leave `Supervisor` blank by design, so the projection is blank too — the entry records **no supervisor name at all**. This breaks the ad-hoc path in PLAN.md Phase 3.
+
+  The write flow must populate `SupervisorName` on every entry, from the registry record or the ad-hoc form, at write time. Do not delete the projection — it stays useful for coordinator views.
+
+**2. 🟠 Convert `LogEntries_DEV.SupervisorDesignation` from Text to Choice.**
+Options: Medical Doctor / Medical Intern / Professional Nurse / Enrolled Nurse / Clinical Associate / Other Health Professional — matching `Supervisor_DEV.Designation`, which is already a Choice. As free text the field cannot be reliably grouped or filtered for accreditation reporting, and app-side and registry-side values will drift apart. The list holds no production rows yet, so converting now costs nothing.
+
+**3. 🟠 Confirm or remove `LogEntries_DEV.Performace` (Number).**
+Not part of the design. If it is intended as a performance/competency rating it needs a defined scale and a decision on who sets it (student self-rating vs supervisor) before the write flow is built — an unlabelled numeric score is not defensible evidence. If it is a stray, delete it before any rows exist.
+
+**4. 🟠 Delete `Procedure_DEV.RequiredCount0`.**
+A duplicate of `RequiredCount`, displayed as "RequiredCount (RequiredCount0)". Two columns with near-identical display names is a live mis-binding risk for progress-count formulas. The 12 Aug 2026 export (`Procedure_DEV.csv`) contains a single `RequiredCount` column, populated on all 148 rows with no blanks — so `RequiredCount` is the real one and `RequiredCount0` appears to be an empty stray. Confirm it holds no data, then delete it.
+
+**5. 🟡 Confirm `TSites_DEV.Radious` is in metres.**
+The haversine site-match compares a metre distance against this value. The column name carries no unit. If it holds kilometres, every geofence check is wrong by 1000×.
+
+**6. ✅ RESOLVED — `Procedure_DEV.Module` is a real grouping axis.** Keep it. See §3.2; the dashboard groups by `Module` and may filter by `Category`.
+
+**7. 🟡 Verify `LogEntries_DEV` permissions.**
+PLAN.md Phase 1 requires that students have **no direct write access**; writes come from the flow's service account only. This cannot be checked through the Canvas MCP — confirm in SharePoint list settings → Permissions.
+
+**8. 🔴 Confirm `StudentList_DEV.Year` option text matches `Procedure_DEV.YearLevel` exactly — blocking Phase 4.**
+Both are **Choice** columns, so the dashboard filter compares their option strings. `YearLevel` uses `"BMCP 1"` / `"BMCP 2"` / `"BMCP 3"` (confirmed from the 12 Aug 2026 export). If `Year` stores anything else — `1`, `"Year 1"`, `"BMCP1"` without the space — the filter silently returns **zero rows** and every student sees an empty dashboard with no error. Choice option text cannot be read through the Canvas MCP; verify in list settings. Either align the two option sets (preferred) or map between them explicitly in `OnStart`; do not rely on coincidence.
+
+**9. 🟠 Delete the duplicate `"Perform general examination"` row in `Procedure_DEV` (BMCP 1).**
+It appears **twice**, identical in every field. `LogEntries.Procedure` is a lookup by row ID, so the two rows are distinct targets: the procedure shows twice on the dashboard, each demanding its own 5 sign-offs, and logging against one never credits the other. Inflates BMCP 1 from 45 procedures / 245 sign-offs to 46 / 250. Delete one — but only before entries reference it.
+
+**10. 🟠 Clarify `StudentList_DEV.Registered` (Boolean, display name "Dereg").**
+The internal name and the display name assert **opposite** meanings, so `Registered = true` is genuinely ambiguous — it could mean "is registered" or "is deregistered". Any active-student filter written against it has a 50% chance of being exactly backwards, which would either hide active students or expose deregistered ones. Confirm the polarity against real rows and record it here before writing the filter.
+
+### 3.2 Procedures content (as loaded, 12 Aug 2026)
+
+Source of truth for what was loaded: `docs/Procedure_DEV.csv` (export of `Procedure_DEV`). Phase 0's "gather the procedure lists" item is **met**. All 148 rows have `Active = True` and no blank fields.
+
+| Year (`YearLevel`) | Procedures | Total required sign-offs |
+|---|---|---|
+| `BMCP 1` | 46 *(45 after the duplicate in §3.1 item 9 is removed)* | 250 *(245 after)* |
+| `BMCP 2` | 51 | 270 |
+| `BMCP 3` | 51 | 237 |
+
+`RequiredCount` is only ever **3**, **5** or **10** — 5 is the default, 10 marks high-volume core skills (history taking, vital signs, IV lines, wound care), 3 marks low-opportunity procedures (neonatal resuscitation, suprapubic catheterisation, posterior nasal packing).
+
+**Two independent grouping axes.** Both are Choice columns and both are useful — they are not redundant:
+
+- **`Category`** — *type of skill*, 4 options across all years: Physical Examination (58), Procedures (58), Communication (20), Investigations (12).
+- **`Module`** — *clinical rotation / body system*. Years 1–2 share one taxonomy; **Year 3 uses a completely separate one, with no overlap**:
+  - **BMCP 1 & 2:** Skills, Resp, CVS, GIT, GUT, CEE, ESR, MSS
+  - **BMCP 3:** CH (Child Health), WH (Women's Health), A&P (Anaesthetics & Peri-operative), HCS (Health Care Systems), MH (Mental Health), INFD (Infectious Diseases), A&E (Accident & Emergency)
+
+**Dashboard implication (Phase 4):** 46–51 procedures per year is far too long for a flat mobile gallery. Group by `Module` — that yields 7–8 sections of 4–12 items each, which is browsable one-handed. Treat `Category` as a filter, not the primary grouping.
+
+**Deliberate cross-year repetition.** 12 procedure titles appear in both BMCP 1 and BMCP 2 (general examination, history taking, sensory/motor examination, urinary catheterisation, and others). This is intended progression, not duplication — each is a separate row with its own ID, so counts stay separate per year. One case escalates its target: *"Perform wound/burn debridement and dressing"* goes from 5 in Year 1 to 10 in Year 2.
+
+> **Consequence for coordinator views:** the `Procedure` lookup in `LogEntries_DEV` displays only `Title`, so a repeated title gives no year context in SharePoint views. Add `YearLevel` as an additional lookup column if coordinators will read entries directly in SharePoint.
 
 ---
 

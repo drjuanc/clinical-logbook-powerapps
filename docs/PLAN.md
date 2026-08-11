@@ -24,7 +24,7 @@ These are hard requirements from DECISION.md §2.7–2.8. Check each screen agai
 
 ## Phase 0 — Prerequisites (content + admin)
 
-- [ ] Gather Year 1/2/3 procedure lists with `RequiredCount` per procedure (blocks Phase 2).
+- [x] Gather Year 1/2/3 procedure lists with `RequiredCount` per procedure (blocks Phase 2). *(Done — 148 procedures loaded and exported to `docs/Procedure_DEV.csv`; taxonomy and volumes in DECISION.md §3.2.)*
 - [ ] Confirm `Latitude`/`Longitude`/`RadiusMetres` for each hospital (blocks Phase 1 site-match).
 - [ ] Provision a **service account** for the write flow.
 - [ ] Confirm coordinator email addresses for conditional visibility.
@@ -34,22 +34,24 @@ These are hard requirements from DECISION.md §2.7–2.8. Check each screen agai
 
 ## Phase 1 — Data foundation (SharePoint)
 
-- [ ] Add `Latitude` (Number), `Longitude` (Number), `RadiusMetres` (Number) to the existing **Hospitals** list; populate.
-- [ ] Create **Procedures** list: `Title`, `YearLevel` (Choice 1/2/3), `RequiredCount` (Number), `Category` (Choice), `Active` (Yes/No).
-- [ ] Create **Supervisors** list: `Title` (full name), `Designation` (Choice), `CouncilNumber` (Text), `Site` (Lookup→Hospitals), `Status` (Choice: Registered/Pending).
-- [ ] Create **LogEntries** list with the full schema from DECISION.md §3.
-- [ ] Set **LogEntries permissions**: no direct student write access (writes come from the flow's service account only).
+*Status 12 Aug 2026: lists built and connected to the canvas app. As-built schema verified via the Canvas Authoring MCP and recorded in DECISION.md §3 — actual list names are `TSites_DEV`, `Procedure_DEV`, `Supervisor_DEV`, `LogEntries_DEV`, `StudentList_DEV`.*
 
-**Exit test:** every list exists; a manually added test LogEntries row displays all columns correctly.
+- [x] Add `Latitude` (Number), `Longitude` (Number), `RadiusMetres` (Number) to the existing **Hospitals** list (`TSites_DEV`); populate. *(Built as `Latitude`, `Longitude`, `Radious` — confirm the unit is metres, DECISION.md §3.1 item 5.)*
+- [x] Create **Procedures** list (`Procedure_DEV`): `Title`, `YearLevel` (Choice 1/2/3), `RequiredCount` (Number), `Category` (Choice), `Active` (Yes/No). *(Plus an extra `Module` Choice; a stray `RequiredCount0` duplicate needs deleting — §3.1 items 4 and 6.)*
+- [x] Create **Supervisors** list (`Supervisor_DEV`): `Title` (full name), `Designation` (Choice), `CouncilNumber` (Text), `Site` (Lookup→TSites), `Status` (Choice: Registered/Pending). *(Matches the design.)*
+- [~] Create **LogEntries** list (`LogEntries_DEV`) with the full schema from DECISION.md §3. **Incomplete —** `SupervisorName` (Text) is missing and `SupervisorDesignation` is Text rather than Choice. See DECISION.md §3.1 items 1–3. **Blocks Phase 3.**
+- [ ] Set **LogEntries permissions**: no direct student write access (writes come from the flow's service account only). *(Not verifiable through the Canvas MCP — check in SharePoint list settings.)*
+
+**Exit test:** every list exists; a manually added test LogEntries row displays all columns correctly. — *Not yet met: the LogEntries schema gaps above must close first.*
 
 ---
 
 ## Phase 2 — Content load
 
-- [ ] Populate **Procedures** from the Year 1/2/3 lists.
-- [ ] Seed **Supervisors** with known internal staff and any pre-registered externals.
+- [x] Populate **Procedures** from the Year 1/2/3 lists. *(148 rows: BMCP 1 = 46, BMCP 2 = 51, BMCP 3 = 51. One duplicate to remove — DECISION.md §3.1 item 9.)*
+- [ ] Seed **Supervisors** with known internal staff and any pre-registered externals. *(Row count not verified — the Canvas MCP cannot read list data.)*
 
-**Exit test:** filtering Procedures by `YearLevel` returns the correct set per year.
+**Exit test:** filtering Procedures by `YearLevel` returns the correct set per year. — *Not yet met.* `YearLevel` uses `"BMCP 1/2/3"`; the filter compares it against the `StudentList_DEV.Year` Choice, whose option text is unconfirmed. A mismatch returns zero rows **silently**. See DECISION.md §3.1 item 8.
 
 > **Caching note:** this reference data (student record, year's Procedures, hospital coordinates/radius, site Supervisors) is what gets preloaded into collections at startup in Phase 4. Keep these lists lean — everything cached is weight the app carries and bandwidth it costs on first load.
 

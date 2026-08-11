@@ -1,0 +1,119 @@
+Screens:
+  scrNotRegistered:
+    Properties:
+      Fill: =ThemeCanvas
+      LoadingSpinnerColor: =ThemePrimary
+    Children:
+      - conNotRegRoot:
+          Control: GroupContainer
+          Variant: AutoLayout
+          Properties:
+            Width: =Parent.Width
+            Height: =Parent.Height
+            LayoutDirection: =LayoutDirection.Vertical
+            LayoutAlignItems: =LayoutAlignItems.Stretch
+            LayoutJustifyContent: =LayoutJustifyContent.Center
+            LayoutGap: =ThemeSpaceL
+            LayoutOverflowY: =LayoutOverflow.Scroll
+            PaddingLeft: =ThemeSpaceL
+            PaddingRight: =ThemeSpaceL
+            PaddingTop: =ThemeSpaceXL
+            PaddingBottom: =ThemeSpaceXL
+            Fill: =ThemeCanvas
+          Children:
+            - imgNotRegLogo:
+                Control: Image
+                Properties:
+                  TabIndex: =-1
+                  Image: =ThemeLogo
+                  ImagePosition: =ImagePosition.Fit
+                  Width: =220
+                  Height: =73
+                  AccessibleLabel: ="Walter Sisulu University"
+                  AlignInContainer: =AlignInContainer.Center
+
+            - lblNotRegHeading:
+                Control: Label
+                Properties:
+                  TabIndex: =-1
+                  Text: ="You're not registered for the logbook"
+                  Font: =ThemeFont
+                  Size: =ThemeSizeDisplay
+                  FontWeight: =FontWeight.Semibold
+                  Color: =ThemePrimary
+                  Align: =Align.Center
+                  AutoHeight: =true
+                  Wrap: =true
+                  Live: =Live.Polite
+                  AlignInContainer: =AlignInContainer.Stretch
+
+            - lblNotRegBody:
+                Control: Label
+                Properties:
+                  TabIndex: =-1
+                  Text: ="There isn't an active logbook record linked to this account yet."
+                  Font: =ThemeFont
+                  Size: =ThemeSizeBody
+                  Color: =ThemeInkMuted
+                  Align: =Align.Center
+                  AutoHeight: =true
+                  Wrap: =true
+                  AlignInContainer: =AlignInContainer.Stretch
+
+            - conNotRegAccount:
+                Control: GroupContainer
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Vertical
+                  LayoutAlignItems: =LayoutAlignItems.Stretch
+                  LayoutGap: =ThemeSpaceXS
+                  PaddingLeft: =ThemeSpaceM
+                  PaddingRight: =ThemeSpaceM
+                  PaddingTop: =ThemeSpaceM
+                  PaddingBottom: =ThemeSpaceM
+                  Fill: =ThemeSurfaceAlt
+                  RadiusTopLeft: =ThemeRadiusSmall
+                  RadiusTopRight: =ThemeRadiusSmall
+                  RadiusBottomLeft: =ThemeRadiusSmall
+                  RadiusBottomRight: =ThemeRadiusSmall
+                  Height: =78
+                  AlignInContainer: =AlignInContainer.Stretch
+                Children:
+                  - lblNotRegAccountKey:
+                      Control: Label
+                      Properties:
+                        TabIndex: =-1
+                        Text: ="You signed in as"
+                        Font: =ThemeFont
+                        Size: =ThemeSizeCaption
+                        Color: =ThemeInkSubtle
+                        Align: =Align.Center
+                        AutoHeight: =true
+                        Wrap: =true
+                        AlignInContainer: =AlignInContainer.Stretch
+                  - lblNotRegAccountVal:
+                      Control: Label
+                      Properties:
+                        TabIndex: =-1
+                        Text: =User().Email
+                        Font: =ThemeFont
+                        Size: =ThemeSizeBody
+                        FontWeight: =FontWeight.Semibold
+                        Color: =ThemeInk
+                        Align: =Align.Center
+                        AutoHeight: =true
+                        Wrap: =true
+                        AlignInContainer: =AlignInContainer.Stretch
+
+            - lblNotRegAction:
+                Control: Label
+                Properties:
+                  TabIndex: =-1
+                  Text: ="Please contact your site coordinator and ask to be added to the clinical logbook."
+                  Font: =ThemeFont
+                  Size: =ThemeSizeBody
+                  Color: =ThemeInk
+                  Align: =Align.Center
+                  AutoHeight: =true
+                  Wrap: =true
+                  AlignInContainer: =AlignInContainer.Stretch

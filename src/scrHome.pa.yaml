@@ -1,0 +1,203 @@
+Screens:
+  scrHome:
+    Properties:
+      Fill: =ThemeCanvas
+      LoadingSpinnerColor: =ThemePrimary
+    Children:
+      - conHomeRoot:
+          Control: GroupContainer
+          Variant: AutoLayout
+          Properties:
+            Width: =Parent.Width
+            Height: =Parent.Height
+            LayoutDirection: =LayoutDirection.Vertical
+            LayoutAlignItems: =LayoutAlignItems.Stretch
+            LayoutJustifyContent: =LayoutJustifyContent.Start
+            LayoutGap: =ThemeSpaceL
+            LayoutOverflowY: =LayoutOverflow.Scroll
+            PaddingLeft: =ThemeSpaceM
+            PaddingRight: =ThemeSpaceM
+            PaddingTop: =ThemeSpaceL
+            PaddingBottom: =ThemeSpaceL
+            Fill: =ThemeCanvas
+          Children:
+            - imgHomeLogo:
+                Control: Image
+                Properties:
+                  TabIndex: =-1
+                  Image: =ThemeLogo
+                  ImagePosition: =ImagePosition.Fit
+                  Width: =170
+                  Height: =56
+                  AccessibleLabel: ="Walter Sisulu University"
+                  AlignInContainer: =AlignInContainer.Start
+
+            - conHomeCard:
+                Control: GroupContainer
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Vertical
+                  LayoutAlignItems: =LayoutAlignItems.Stretch
+                  LayoutGap: =ThemeSpaceS
+                  PaddingLeft: =ThemeSpaceL
+                  PaddingRight: =ThemeSpaceL
+                  PaddingTop: =ThemeSpaceL
+                  PaddingBottom: =ThemeSpaceL
+                  Fill: =ThemeSurface
+                  BorderStyle: =BorderStyle.Solid
+                  BorderThickness: =1
+                  BorderColor: =ThemeLine
+                  RadiusTopLeft: =ThemeRadius
+                  RadiusTopRight: =ThemeRadius
+                  RadiusBottomLeft: =ThemeRadius
+                  RadiusBottomRight: =ThemeRadius
+                  Height: =300
+                  AlignInContainer: =AlignInContainer.Stretch
+                Children:
+                  - lblHomeEyebrow:
+                      Control: Label
+                      Properties:
+                        TabIndex: =-1
+                        Text: ="SIGNED IN AS"
+                        Font: =ThemeFont
+                        Size: =ThemeSizeCaption
+                        Color: =ThemeInkSubtle
+                        AutoHeight: =true
+                        Wrap: =true
+                        AlignInContainer: =AlignInContainer.Stretch
+                  - lblHomeName:
+                      Control: Label
+                      Properties:
+                        TabIndex: =-1
+                        Text: =Coalesce(varStudent.Name, "Unnamed student")
+                        Font: =ThemeFont
+                        Size: =ThemeSizeHeading
+                        FontWeight: =FontWeight.Semibold
+                        Color: =ThemePrimary
+                        AutoHeight: =true
+                        Wrap: =true
+                        AlignInContainer: =AlignInContainer.Stretch
+                  # A container, not a Rectangle: Rectangle is treated as an
+                  # interactive control by the accessibility checker and demands
+                  # an accessible label, which a purely decorative rule should
+                  # not have. A container carries no such semantics.
+                  - conHomeRule:
+                      Control: GroupContainer
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Horizontal
+                        Fill: =ThemeLine
+                        Height: =1
+                        AlignInContainer: =AlignInContainer.Stretch
+
+                  - conRowNumber:
+                      Control: GroupContainer
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Horizontal
+                        LayoutAlignItems: =LayoutAlignItems.Center
+                        LayoutGap: =ThemeSpaceS
+                        Height: =44
+                        AlignInContainer: =AlignInContainer.Stretch
+                      Children:
+                        - lblNumberKey:
+                            Control: Label
+                            Properties:
+                              TabIndex: =-1
+                              Text: ="Student number"
+                              Font: =ThemeFont
+                              Size: =ThemeSizeBody
+                              Color: =ThemeInkMuted
+                              Width: =150
+                              AlignInContainer: =AlignInContainer.Stretch
+                        - lblNumberVal:
+                            Control: Label
+                            Properties:
+                              TabIndex: =-1
+                              Text: =Coalesce(varStudent.Number, "—")
+                              Font: =ThemeFont
+                              Size: =ThemeSizeBody
+                              FontWeight: =FontWeight.Semibold
+                              Color: =ThemeInk
+                              Align: =Align.Right
+                              FillPortions: =1
+                              AlignInContainer: =AlignInContainer.Stretch
+
+                  - conRowYear:
+                      Control: GroupContainer
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Horizontal
+                        LayoutAlignItems: =LayoutAlignItems.Center
+                        LayoutGap: =ThemeSpaceS
+                        Height: =44
+                        AlignInContainer: =AlignInContainer.Stretch
+                      Children:
+                        - lblYearKey:
+                            Control: Label
+                            Properties:
+                              TabIndex: =-1
+                              Text: ="Year"
+                              Font: =ThemeFont
+                              Size: =ThemeSizeBody
+                              Color: =ThemeInkMuted
+                              Width: =150
+                              AlignInContainer: =AlignInContainer.Stretch
+                        - lblYearVal:
+                            Control: Label
+                            Properties:
+                              TabIndex: =-1
+                              Text: =Coalesce(varStudent.Year.Value, "—")
+                              Font: =ThemeFont
+                              Size: =ThemeSizeBody
+                              FontWeight: =FontWeight.Semibold
+                              Color: =ThemeInk
+                              Align: =Align.Right
+                              FillPortions: =1
+                              AlignInContainer: =AlignInContainer.Stretch
+
+                  - conRowHospital:
+                      Control: GroupContainer
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Horizontal
+                        LayoutAlignItems: =LayoutAlignItems.Center
+                        LayoutGap: =ThemeSpaceS
+                        Height: =44
+                        AlignInContainer: =AlignInContainer.Stretch
+                      Children:
+                        - lblHospitalKey:
+                            Control: Label
+                            Properties:
+                              TabIndex: =-1
+                              Text: ="Hospital"
+                              Font: =ThemeFont
+                              Size: =ThemeSizeBody
+                              Color: =ThemeInkMuted
+                              Width: =150
+                              AlignInContainer: =AlignInContainer.Stretch
+                        - lblHospitalVal:
+                            Control: Label
+                            Properties:
+                              TabIndex: =-1
+                              Text: =Coalesce(varStudent.Hospital.Value, "—")
+                              Font: =ThemeFont
+                              Size: =ThemeSizeBody
+                              FontWeight: =FontWeight.Semibold
+                              Color: =ThemeInk
+                              Align: =Align.Right
+                              Wrap: =true
+                              FillPortions: =1
+                              AlignInContainer: =AlignInContainer.Stretch
+
+            - lblHomePlaceholder:
+                Control: Label
+                Properties:
+                  TabIndex: =-1
+                  Text: ="Dashboard coming next — this screen exists only to confirm the identity lookup resolved correctly."
+                  Font: =ThemeFont
+                  Size: =ThemeSizeCaption
+                  Color: =ThemeInkSubtle
+                  AutoHeight: =true
+                  Wrap: =true
+                  AlignInContainer: =AlignInContainer.Stretch

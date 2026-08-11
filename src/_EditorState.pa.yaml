@@ -1,0 +1,5 @@
+EditorState:
+  ScreensOrder:
+    - scrSplash
+    - scrHome
+    - scrNotRegistered
