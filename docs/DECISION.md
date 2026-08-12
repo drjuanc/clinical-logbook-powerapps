@@ -2,8 +2,9 @@
 
 **Project:** Student clinical procedures logbook
 **Platform:** Microsoft 365 tenant (Power Apps canvas + SharePoint + Power Automate)
-**Status:** Design settled — ready for build
-**Last updated:** 11 August 2026
+**Status:** Design settled · build in progress — data foundation and content loaded, identity flow and theme built (see PLAN.md for phase state)
+**Last updated:** 12 August 2026
+**Open blockers:** §3.1 items 1 and 8 — `LogEntries_DEV` has no `SupervisorName` column; `YearLevel` / `Year` choice text may not match.
 
 ---
 
@@ -70,6 +71,18 @@ Replace the paper clinical logbook with an electronic system that tracks procedu
 - Prefer **collections and variables** over repeated `LookUp`/`Filter` calls that each hit the network.
 - Add a **manual "refresh reference data"** action (re-runs the collection load) so cached lists can be updated without reinstalling — students refresh only when told procedures/supervisors changed.
 **Rationale:** On a slow or intermittent connection, every avoided round-trip is the difference between a usable and an abandoned app. Static reference data cached locally means logging a procedure needs almost no bandwidth beyond the single write.
+
+### 2.9 Theming — WSU brand tokens as named formulas (LOCKED)
+**Decision:** The palette is derived from the official WSU logo and exposed as **named formulas** in `App.Properties.Formulas`. Screens reference tokens (`ThemePrimary`, `ThemeInk`, `ThemeSpaceM`) and **never** a raw hex value or pixel constant. Full palette, roles and contrast figures: **`docs/THEME.md`**.
+**Rules:**
+- Colours are sampled from `docs/design/WSU_new_logo.png` itself, not approximated. `#551516` maroon anchors the palette; the amber, sage and crimson chevrons supply the accent and semantic colours, so status colours are brand-native rather than generic web green and red.
+- Every token is **contrast-checked against all three background tokens** before being added, and the worst-case ratio recorded. Targets: 4.5:1 normal text, 3:1 large text and non-text UI boundaries. **A token that has not been contrast-checked does not go in the palette.**
+- **`ThemeAccent` (`#CF8029`) is fills and graphics only** — at 2.82:1 it fails AA for text and misses the 3:1 non-text threshold on the canvas background. `ThemeAccentDeep` is the text-safe amber.
+- Type comes from the fonts Power Apps ships natively (`Open Sans`), so nothing is fetched over the network at launch.
+- Tap targets are at least `ThemeTouchTarget` (48).
+**Rationale:** One definition means a brand change is a single edit rather than a search across every screen, and it makes accessibility enforceable — contrast is verified once per token instead of re-argued per control. Sampling from the logo rather than eyeballing keeps the app visibly the university's.
+
+**Accessibility checker note:** the built-in checker reports ~33 findings against static labels, prescribing `TabIndex = 0`. This is **deliberately not applied** — it would place every static caption in the keyboard tab order, which is worse for keyboard and switch users. Static text carries `TabIndex: =-1`. Real interactive controls (buttons, inputs, Pen Input) get `TabIndex: =0` **and** a visible focus border, and their findings must be taken seriously. Reasoning in `docs/THEME.md` §6.
 
 ---
 
