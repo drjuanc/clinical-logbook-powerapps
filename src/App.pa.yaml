@@ -53,6 +53,10 @@ App:
       ThemeRadius = 12;
       ThemeRadiusSmall = 8;
       ThemeTouchTarget = 48;                       // WCAG 2.5.5 thumb minimum
+      ThemeRadiusPill = 999;                       // clamps to a pill/circle
+      ThemeAvatarSize = 48;                        // initials circle
+      ThemeBarHeight = 6;                          // thin progress bar
+      ThemeRowHeight = 64;                         // one procedure row
 
       // ---- Brand asset -----------------------------------------------------
       // Embedded as a data URI so the app is self-contained and the logo is
