@@ -1,0 +1,164 @@
+Screens:
+  scrSplash:
+    Properties:
+      Fill: =ThemeCanvas
+      LoadingSpinnerColor: =ThemePrimary
+      OnVisible: |
+        =// Resolve identity here rather than in App.OnStart so the student sees
+        // this loading state instead of a frozen launch on a slow connection.
+        //
+        // NOTE: 'Student' is a Person column, so this LookUp is NOT delegable
+        // to SharePoint - Power Apps pulls up to the data row limit and matches
+        // locally. See the delegation note in docs/DECISION.md 3.1.
+        Set(varStudent, LookUp(StudentList_DEV, Student.Email = User().Email));
+        Set(varStudentFound, !IsBlank(varStudent));
+
+        // Active/inactive is keyed off Dereg_Date, NOT the Boolean: that column
+        // has internal name 'Registered' but display name 'Dereg', so its
+        // polarity is ambiguous (DECISION.md 3.1 item 10). A blank Dereg_Date
+        // is unambiguous either way. Add the Boolean term once confirmed.
+        Set(varStudentActive, varStudentFound && IsBlank(varStudent.Dereg_Date));
+
+        // Reference data for the first screen only. colSupervisors/colHospitals
+        // are deliberately NOT loaded here - nothing on scrHome needs them, and
+        // DECISION.md 2.8 says to defer non-critical loads rather than pay for
+        // them at launch. They belong on the Phase 5 entry screens.
+        //
+        // WARNING: this filter is the blocker in DECISION.md 3.1 item 8.
+        // YearLevel holds "BMCP 1"/"BMCP 2"/"BMCP 3". If StudentList_DEV.Year's
+        // choice text differs by so much as a space, colProcedures comes back
+        // EMPTY with no error. scrHome renders an explicit empty state naming
+        // this cause rather than showing a blank gallery.
+        If(
+            varStudentActive,
+            Concurrent(
+                ClearCollect(
+                    colProcedures,
+                    AddColumns(
+                        Filter(
+                            Procedure_DEV,
+                            Active = true,
+                            YearLevel.Value = varStudent.Year.Value
+                        ),
+                        ModuleName,
+                        Coalesce(Module.Value, "Other")
+                    )
+                ),
+                Set(varYearLabel, Coalesce(varStudent.Year.Value, "—"))
+            );
+            ClearCollect(colModules, GroupBy(colProcedures, ModuleName, ModuleItems));
+
+            // Flatten to one row list with module headers interleaved, built
+            // ONCE here rather than per render (DECISION.md 2.8).
+            //
+            // Why not a nested gallery: Gallery.TemplateSize cannot reference
+            // ThisItem, so every outer row would be forced to the same height.
+            // Module groups range from 2 to 12 procedures, so a uniform height
+            // means either clipping the big groups or padding the small ones
+            // with blank space. A flat list of uniform-height rows, with header
+            // rows carrying the module name, groups the list visually without
+            // that trade-off.
+            // Built as ONE expression and collected once. Mutating inside
+            // ForAll would emit a change notification per module and re-run
+            // every dependent control rule each time.
+            ClearCollect(
+                colHomeRows,
+                Ungroup(
+                    ForAll(
+                        colModules As m,
+                        {
+                            Rows: ForAll(
+                                Sequence(CountRows(m.ModuleItems) + 1) As s,
+                                If(
+                                    s.Value = 1,
+                                    {
+                                        RowType: "H",
+                                        ModName: m.ModuleName,
+                                        PTitle: "",
+                                        PId: 0,
+                                        PReq: 0
+                                    },
+                                    With(
+                                        {p: Index(m.ModuleItems, s.Value - 1)},
+                                        {
+                                            RowType: "P",
+                                            ModName: m.ModuleName,
+                                            PTitle: p.Title,
+                                            PId: p.ID,
+                                            PReq: p.RequiredCount
+                                        }
+                                    )
+                                )
+                            )
+                        }
+                    ),
+                    Rows
+                )
+            )
+        )
+    Children:
+      - conSplashRoot:
+          Control: GroupContainer
+          Variant: AutoLayout
+          Properties:
+            Width: =Parent.Width
+            Height: =Parent.Height
+            LayoutDirection: =LayoutDirection.Vertical
+            LayoutAlignItems: =LayoutAlignItems.Center
+            LayoutJustifyContent: =LayoutJustifyContent.Center
+            LayoutGap: =ThemeSpaceL
+            PaddingLeft: =ThemeSpaceXL
+            PaddingRight: =ThemeSpaceXL
+            Fill: =ThemeCanvas
+          Children:
+            - imgSplashLogo:
+                Control: Image
+                Properties:
+                  TabIndex: =-1
+                  Image: =ThemeLogo
+                  ImagePosition: =ImagePosition.Fit
+                  Width: =260
+                  Height: =86
+                  AccessibleLabel: ="Walter Sisulu University"
+                  AlignInContainer: =AlignInContainer.Center
+            - spnSplash:
+                Control: Spinner
+                Properties:
+                  SpinnerColor: =ThemePrimary
+                  TrackColor: =ThemeLine
+                  AccessibleLabel: ="Checking your registration"
+                  AlignInContainer: =AlignInContainer.Center
+            - lblSplashStatus:
+                Control: Label
+                Properties:
+                  TabIndex: =-1
+                  Text: ="Checking your registration…"
+                  Font: =ThemeFont
+                  Size: =ThemeSizeBody
+                  Color: =ThemeInkMuted
+                  Align: =Align.Center
+                  AutoHeight: =true
+                  Wrap: =true
+                  Live: =Live.Polite
+                  AlignInContainer: =AlignInContainer.Stretch
+            # Routing runs from the timer, not OnVisible: Power Apps rejects an
+            # OnVisible in which every branch navigates. The short delay also
+            # guarantees the splash is actually seen rather than flashing past.
+            # The timer must stay Visible - a hidden timer does not tick - so it
+            # is sized to 1px, which is invisible in practice.
+            - tmrSplashRoute:
+                Control: Timer
+                Properties:
+                  Duration: =900
+                  AutoStart: =true
+                  Repeat: =false
+                  Visible: =true
+                  Height: =1
+                  Width: =1
+                  Text: =""
+                  BorderThickness: =0
+                  Fill: =ThemeCanvas
+                  AlignInContainer: =AlignInContainer.Center
+                  OnTimerEnd: |
+                    =If(varStudentActive, Navigate(scrHome, ScreenTransition.Fade));
+                    If(!varStudentActive, Navigate(scrNotRegistered, ScreenTransition.Fade))

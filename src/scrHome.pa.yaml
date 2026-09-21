@@ -1,0 +1,502 @@
+Screens:
+  scrHome:
+    Properties:
+      Fill: =ThemeCanvas
+      LoadingSpinnerColor: =ThemePrimary
+      OnVisible: |
+        =// The student's own entries, pulled once and read from memory
+        // thereafter. Per-row counts in the gallery run against colMyEntries -
+        // never a live query per row, which on 51 rows would be 51 round-trips
+        // on a bad connection (DECISION.md 2.8).
+        //
+        // 'Student' on LogEntries_DEV is a LOOKUP, not a Person column, so the
+        // filter is Student.Id against varStudent.ID - there is no .Email here.
+        //
+        // WARNING: SharePoint lookup columns are not delegable. This pulls up
+        // to the data row limit and filters on the device, which conflicts with
+        // the guardrail "never pull the full LogEntries list". Fine while the
+        // list is small; needs revisiting before the list grows. See the note
+        // in docs/DECISION.md 3.1.
+        ClearCollect(colMyEntries, Filter(LogEntries_DEV, Student.Id = varStudent.ID));
+
+        // Overall progress counts sign-offs, not procedures, and caps each
+        // procedure at its RequiredCount so over-logging one cannot mask
+        // another that is untouched.
+        Set(varTotalRequired, Sum(colProcedures, RequiredCount));
+        Set(
+            varTotalLogged,
+            Sum(
+                AddColumns(
+                    colProcedures As pr,
+                    DoneCapped,
+                    Min(
+                        CountRows(Filter(colMyEntries, Procedure.Id = pr.ID)),
+                        pr.RequiredCount
+                    )
+                ),
+                DoneCapped
+            )
+        )
+    Children:
+      - conHomeRoot:
+          Control: GroupContainer
+          Variant: AutoLayout
+          Properties:
+            Width: =Parent.Width
+            Height: =Parent.Height
+            LayoutDirection: =LayoutDirection.Vertical
+            LayoutAlignItems: =LayoutAlignItems.Stretch
+            LayoutJustifyContent: =LayoutJustifyContent.Start
+            LayoutGap: =ThemeSpaceM
+            PaddingLeft: =ThemeSpaceM
+            PaddingRight: =ThemeSpaceM
+            PaddingTop: =ThemeSpaceM
+            PaddingBottom: =ThemeSpaceS
+            Fill: =ThemeCanvas
+          Children:
+
+            # ---- 1. Header row ------------------------------------------
+            - conHomeHeader:
+                Control: GroupContainer
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  LayoutAlignItems: =LayoutAlignItems.Center
+                  LayoutGap: =ThemeSpaceS
+                  Height: =ThemeTouchTarget
+                  AlignInContainer: =AlignInContainer.Stretch
+                Children:
+                  # Initials circle instead of varStudent.Pic: the image column
+                  # access pattern is unverified, and an avatar fetch is weight
+                  # on first paint for no functional gain.
+                  - conHomeAvatar:
+                      Control: GroupContainer
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Center
+                        LayoutJustifyContent: =LayoutJustifyContent.Center
+                        Width: =ThemeAvatarSize
+                        Height: =ThemeAvatarSize
+                        Fill: =ThemePrimary
+                        RadiusTopLeft: =ThemeRadiusPill
+                        RadiusTopRight: =ThemeRadiusPill
+                        RadiusBottomLeft: =ThemeRadiusPill
+                        RadiusBottomRight: =ThemeRadiusPill
+                      Children:
+                        - lblHomeInitials:
+                            Control: Label
+                            Properties:
+                              TabIndex: =-1
+                              Text: |
+                                =Upper(
+                                    Left(Coalesce(varStudent.Name, "?"), 1) &
+                                    Left(Last(Split(Coalesce(varStudent.Name, ""), " ")).Value, 1)
+                                )
+                              Font: =ThemeFont
+                              Size: =ThemeSizeBody
+                              FontWeight: =FontWeight.Semibold
+                              Color: =ThemeSurface
+                              Align: =Align.Center
+                              VerticalAlign: =VerticalAlign.Middle
+                              Width: =ThemeAvatarSize
+                              Height: =ThemeAvatarSize
+                  - conHomeHeaderText:
+                      Control: GroupContainer
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Stretch
+                        LayoutJustifyContent: =LayoutJustifyContent.Center
+                        LayoutGap: =0
+                        FillPortions: =1
+                        AlignInContainer: =AlignInContainer.Stretch
+                      Children:
+                        - lblHomeName:
+                            Control: Label
+                            Properties:
+                              TabIndex: =-1
+                              Text: =Coalesce(varStudent.Name, "Unnamed student")
+                              Font: =ThemeFont
+                              Size: =ThemeSizeSubhead
+                              FontWeight: =FontWeight.Semibold
+                              Color: =ThemeInk
+                              Height: =24
+                              AlignInContainer: =AlignInContainer.Stretch
+                        - lblHomeSubtitle:
+                            Control: Label
+                            Properties:
+                              TabIndex: =-1
+                              Text: |
+                                =Coalesce(varStudent.Year.Value, "—") & " · " &
+                                 Coalesce(varStudent.Hospital.Value, "—")
+                              Font: =ThemeFont
+                              Size: =ThemeSizeCaption
+                              Color: =ThemeInkSubtle
+                              Height: =20
+                              AlignInContainer: =AlignInContainer.Stretch
+                  # A Button, not an Icon: FluentV9 Icon has no OnSelect, and
+                  # Classic/Icon could not be inspected (describe_control 500).
+                  - btnHomeRefresh:
+                      Control: Button
+                      Properties:
+                        Text: ="↻"
+                        AccessibleLabel: ="Refresh reference data"
+                        Font: =ThemeFont
+                        FontSize: =ThemeSizeSubhead
+                        FontColor: =ThemePrimary
+                        BasePaletteColor: =ThemePrimary
+                        BorderThickness: =0
+                        Width: =ThemeTouchTarget
+                        Height: =ThemeTouchTarget
+                        BorderRadius: =ThemeRadiusPill
+                        OnSelect: =Navigate(scrSplash, ScreenTransition.Fade)
+
+            # ---- 2. Overall progress card -------------------------------
+            - conHomeProgress:
+                Control: GroupContainer
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Vertical
+                  LayoutAlignItems: =LayoutAlignItems.Stretch
+                  LayoutGap: =ThemeSpaceXS
+                  PaddingLeft: =ThemeSpaceM
+                  PaddingRight: =ThemeSpaceM
+                  PaddingTop: =ThemeSpaceM
+                  PaddingBottom: =ThemeSpaceM
+                  Height: =120
+                  Fill: =ThemeSurface
+                  BorderStyle: =BorderStyle.Solid
+                  BorderThickness: =1
+                  BorderColor: =ThemeLine
+                  RadiusTopLeft: =ThemeRadius
+                  RadiusTopRight: =ThemeRadius
+                  RadiusBottomLeft: =ThemeRadius
+                  RadiusBottomRight: =ThemeRadius
+                  AlignInContainer: =AlignInContainer.Stretch
+                Children:
+                  - lblProgressLabel:
+                      Control: Label
+                      Properties:
+                        TabIndex: =-1
+                        Text: ="Overall progress"
+                        Font: =ThemeFont
+                        Size: =ThemeSizeCaption
+                        Color: =ThemeInkSubtle
+                        Height: =18
+                        AlignInContainer: =AlignInContainer.Stretch
+                  - lblProgressValue:
+                      Control: Label
+                      Properties:
+                        TabIndex: =-1
+                        Text: |
+                          =varTotalLogged & " / " & varTotalRequired & " logged"
+                        Font: =ThemeFont
+                        Size: =ThemeSizeHeading
+                        FontWeight: =FontWeight.Semibold
+                        Color: =ThemePrimary
+                        Height: =34
+                        AlignInContainer: =AlignInContainer.Stretch
+                  - conProgressTrack:
+                      Control: GroupContainer
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Horizontal
+                        LayoutJustifyContent: =LayoutJustifyContent.Start
+                        Height: =ThemeBarHeight
+                        Fill: =ThemeLine
+                        RadiusTopLeft: =ThemeRadiusPill
+                        RadiusTopRight: =ThemeRadiusPill
+                        RadiusBottomLeft: =ThemeRadiusPill
+                        RadiusBottomRight: =ThemeRadiusPill
+                        AlignInContainer: =AlignInContainer.Stretch
+                      Children:
+                        - conProgressFill:
+                            Control: GroupContainer
+                            Variant: AutoLayout
+                            Properties:
+                              LayoutDirection: =LayoutDirection.Horizontal
+                              Height: =ThemeBarHeight
+                              Width: |
+                                =Parent.Width *
+                                 If(varTotalRequired > 0, varTotalLogged / varTotalRequired, 0)
+                              Fill: |
+                                =If(
+                                     varTotalRequired > 0 && varTotalLogged >= varTotalRequired,
+                                     ThemeSuccess,
+                                     ThemeAccent
+                                 )
+                              RadiusTopLeft: =ThemeRadiusPill
+                              RadiusTopRight: =ThemeRadiusPill
+                              RadiusBottomLeft: =ThemeRadiusPill
+                              RadiusBottomRight: =ThemeRadiusPill
+
+            # ---- 3. Section label ---------------------------------------
+            - lblHomeSection:
+                Control: Label
+                Properties:
+                  TabIndex: =-1
+                  Text: ="Your procedures — " & Coalesce(varYearLabel, "—")
+                  Font: =ThemeFont
+                  Size: =ThemeSizeSubhead
+                  FontWeight: =FontWeight.Semibold
+                  Color: =ThemeInk
+                  Height: =24
+                  AlignInContainer: =AlignInContainer.Stretch
+
+            # ---- Empty state: makes the 3.1 item 8 failure VISIBLE -------
+            - lblHomeEmpty:
+                Control: Label
+                Properties:
+                  TabIndex: =-1
+                  Visible: =CountRows(colProcedures) = 0
+                  Text: |
+                    ="No procedures found for " & Coalesce(varYearLabel, "your year") &
+                     ". Please contact your site coordinator."
+                  Font: =ThemeFont
+                  Size: =ThemeSizeBody
+                  Color: =ThemeWarning
+                  Fill: =ThemeWarningTint
+                  Align: =Align.Center
+                  PaddingLeft: =ThemeSpaceM
+                  PaddingRight: =ThemeSpaceM
+                  PaddingTop: =ThemeSpaceM
+                  PaddingBottom: =ThemeSpaceM
+                  AutoHeight: =true
+                  Wrap: =true
+                  Live: =Live.Polite
+                  AlignInContainer: =AlignInContainer.Stretch
+
+            # ---- 4. Procedure gallery, grouped by Module ----------------
+            - galProcedures:
+                Control: Gallery
+                Variant: Vertical
+                Properties:
+                  Items: =colHomeRows
+                  Visible: =CountRows(colProcedures) > 0
+                  TemplateSize: =ThemeRowHeight
+                  TemplatePadding: =0
+                  ShowScrollbar: =true
+                  Fill: =ThemeCanvas
+                  TabIndex: =0
+                  FocusedBorderThickness: =2
+                  AccessibleLabel: ="Procedures grouped by module"
+                  FillPortions: =1
+                  AlignInContainer: =AlignInContainer.Stretch
+                Children:
+
+                  # --- Module header row (RowType "H") ---
+                  - conRowHeader:
+                      Control: GroupContainer
+                      Variant: AutoLayout
+                      Properties:
+                        Visible: =ThisItem.RowType = "H"
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Stretch
+                        LayoutJustifyContent: =LayoutJustifyContent.End
+                        PaddingLeft: =ThemeSpaceS
+                        PaddingBottom: =ThemeSpaceS
+                        Width: =Parent.TemplateWidth
+                        Height: =ThemeRowHeight
+                        Fill: =ThemeCanvas
+                      Children:
+                        - lblRowHeader:
+                            Control: Label
+                            Properties:
+                              TabIndex: =-1
+                              Text: =Upper(ThisItem.ModName)
+                              Font: =ThemeFont
+                              Size: =ThemeSizeCaption
+                              FontWeight: =FontWeight.Semibold
+                              Color: =ThemeAccentDeep
+                              VerticalAlign: =VerticalAlign.Bottom
+                              Height: =24
+                              AlignInContainer: =AlignInContainer.Stretch
+
+                  # --- Procedure row (RowType "P") ---
+                  - conRowProc:
+                      Control: GroupContainer
+                      Variant: AutoLayout
+                      Properties:
+                        Visible: =ThisItem.RowType = "P"
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Stretch
+                        LayoutJustifyContent: =LayoutJustifyContent.Center
+                        LayoutGap: =ThemeSpaceXS
+                        PaddingLeft: =ThemeSpaceS
+                        PaddingRight: =ThemeSpaceS
+                        PaddingTop: =ThemeSpaceS
+                        PaddingBottom: =ThemeSpaceS
+                        Width: =Parent.TemplateWidth
+                        Height: =ThemeRowHeight
+                        Fill: =ThemeSurface
+                      Children:
+                        - conProcTop:
+                            Control: GroupContainer
+                            Variant: AutoLayout
+                            Properties:
+                              LayoutDirection: =LayoutDirection.Horizontal
+                              LayoutAlignItems: =LayoutAlignItems.Center
+                              LayoutGap: =ThemeSpaceS
+                              Height: =28
+                              AlignInContainer: =AlignInContainer.Stretch
+                            Children:
+                              - lblProcName:
+                                  Control: Label
+                                  Properties:
+                                    TabIndex: =-1
+                                    Text: =ThisItem.PTitle
+                                    Font: =ThemeFont
+                                    Size: =ThemeSizeBody
+                                    Color: =ThemeInk
+                                    VerticalAlign: =VerticalAlign.Middle
+                                    Wrap: =false
+                                    FillPortions: =1
+                                    AlignInContainer: =AlignInContainer.Stretch
+                              - lblProcCount:
+                                  Control: Label
+                                  Properties:
+                                    TabIndex: =-1
+                                    Text: |
+                                      =CountRows(
+                                          Filter(colMyEntries, Procedure.Id = ThisItem.PId)
+                                       ) & " / " & ThisItem.PReq
+                                    Font: =ThemeFont
+                                    Size: =ThemeSizeBody
+                                    FontWeight: =FontWeight.Semibold
+                                    Color: |
+                                      =If(
+                                           CountRows(
+                                               Filter(colMyEntries, Procedure.Id = ThisItem.PId)
+                                           ) >= ThisItem.PReq,
+                                           ThemeSuccess,
+                                           ThemeAccentDeep
+                                       )
+                                    Align: =Align.Right
+                                    VerticalAlign: =VerticalAlign.Middle
+                                    Width: =80
+                                    AlignInContainer: =AlignInContainer.Stretch
+                        - conProcTrack:
+                            Control: GroupContainer
+                            Variant: AutoLayout
+                            Properties:
+                              LayoutDirection: =LayoutDirection.Horizontal
+                              LayoutJustifyContent: =LayoutJustifyContent.Start
+                              Height: =ThemeBarHeight
+                              Fill: =ThemeLine
+                              RadiusTopLeft: =ThemeRadiusPill
+                              RadiusTopRight: =ThemeRadiusPill
+                              RadiusBottomLeft: =ThemeRadiusPill
+                              RadiusBottomRight: =ThemeRadiusPill
+                              AlignInContainer: =AlignInContainer.Stretch
+                            Children:
+                              - conProcFill:
+                                  Control: GroupContainer
+                                  Variant: AutoLayout
+                                  Properties:
+                                    LayoutDirection: =LayoutDirection.Horizontal
+                                    Height: =ThemeBarHeight
+                                    Width: |
+                                      =Parent.Width *
+                                       Min(
+                                           1,
+                                           CountRows(
+                                               Filter(colMyEntries, Procedure.Id = ThisItem.PId)
+                                           ) / Max(ThisItem.PReq, 1)
+                                       )
+                                    Fill: |
+                                      =If(
+                                           CountRows(
+                                               Filter(colMyEntries, Procedure.Id = ThisItem.PId)
+                                           ) >= ThisItem.PReq,
+                                           ThemeSuccess,
+                                           ThemeAccent
+                                       )
+                                    RadiusTopLeft: =ThemeRadiusPill
+                                    RadiusTopRight: =ThemeRadiusPill
+                                    RadiusBottomLeft: =ThemeRadiusPill
+                                    RadiusBottomRight: =ThemeRadiusPill
+
+            # ---- 5. Primary action --------------------------------------
+            - btnNewEntry:
+                Control: Button
+                Properties:
+                  Text: ="Log a procedure"
+                  AccessibleLabel: ="Log a procedure"
+                  Font: =ThemeFont
+                  FontSize: =ThemeSizeBody
+                  FontWeight: =FontWeight.Semibold
+                  FontColor: =ThemeSurface
+                  BasePaletteColor: =ThemePrimary
+                  BorderThickness: =0
+                  Height: =ThemeTouchTarget
+                  BorderRadius: =ThemeRadiusSmall
+                  AlignInContainer: =AlignInContainer.Stretch
+                  # scrEntry does not exist yet (Phase 5). Wired to a notice
+                  # rather than a dead Navigate that would fail to compile.
+                  OnSelect: |
+                    =Notify("The entry screen is not built yet.", NotificationType.Information)
+
+            # ---- 6. Bottom nav ------------------------------------------
+            # Logbook and Profile are Disabled, not wired: scrLogbook and
+            # scrProfile do not exist. The Coordinator tab is not built at all.
+            - conHomeNav:
+                Control: GroupContainer
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  LayoutAlignItems: =LayoutAlignItems.Stretch
+                  LayoutGap: =0
+                  Height: =ThemeTouchTarget
+                  Fill: =ThemeSurface
+                  BorderStyle: =BorderStyle.Solid
+                  BorderThickness: =1
+                  BorderColor: =ThemeLine
+                  RadiusTopLeft: =ThemeRadiusSmall
+                  RadiusTopRight: =ThemeRadiusSmall
+                  RadiusBottomLeft: =ThemeRadiusSmall
+                  RadiusBottomRight: =ThemeRadiusSmall
+                  AlignInContainer: =AlignInContainer.Stretch
+                Children:
+                  - btnNavHome:
+                      Control: Button
+                      Properties:
+                        Text: ="Home"
+                        AccessibleLabel: ="Home, current screen"
+                        Font: =ThemeFont
+                        FontSize: =ThemeSizeCaption
+                        FontWeight: =FontWeight.Semibold
+                        FontColor: =ThemePrimary
+                        BasePaletteColor: =ThemePrimary
+                        BorderThickness: =0
+                        FillPortions: =1
+                        AlignInContainer: =AlignInContainer.Stretch
+                        OnSelect: =false
+                  - btnNavLogbook:
+                      Control: Button
+                      Properties:
+                        Text: ="Logbook"
+                        AccessibleLabel: ="Logbook, not available yet"
+                        Font: =ThemeFont
+                        FontSize: =ThemeSizeCaption
+                        FontColor: =ThemeInkSubtle
+                        BasePaletteColor: =ThemeInkSubtle
+                        BorderThickness: =0
+                        DisplayMode: =DisplayMode.Disabled
+                        FillPortions: =1
+                        AlignInContainer: =AlignInContainer.Stretch
+                        OnSelect: =false
+                  - btnNavProfile:
+                      Control: Button
+                      Properties:
+                        Text: ="Profile"
+                        AccessibleLabel: ="Profile, not available yet"
+                        Font: =ThemeFont
+                        FontSize: =ThemeSizeCaption
+                        FontColor: =ThemeInkSubtle
+                        BasePaletteColor: =ThemeInkSubtle
+                        BorderThickness: =0
+                        DisplayMode: =DisplayMode.Disabled
+                        FillPortions: =1
+                        AlignInContainer: =AlignInContainer.Stretch
+                        OnSelect: =false
